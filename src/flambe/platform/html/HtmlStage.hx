@@ -38,8 +38,10 @@ class HtmlStage
         scaleFactor = computeScaleFactor();
         if (scaleFactor != 1) {
             Log.info("Reversing device DPI scaling", ["scaleFactor", scaleFactor]);
-            HtmlUtil.setVendorStyle(_canvas, "transform-origin", "top left");
-            HtmlUtil.setVendorStyle(_canvas, "transform", "scale(" + (1/scaleFactor) + ")");
+            // #clover, Removing this since the other scale hack is removed, the game isn't
+            // scaled right without removing this code
+//            HtmlUtil.setVendorStyle(_canvas, "transform-origin", "top left");
+//            HtmlUtil.setVendorStyle(_canvas, "transform", "scale(" + (1/scaleFactor) + ")");
         }
 #end
 
@@ -231,9 +233,13 @@ class HtmlStage
         var scale = devicePixelRatio / backingStorePixelRatio;
         var screenWidth = Browser.window.screen.width;
         var screenHeight = Browser.window.screen.height;
-        if (scale*screenWidth > 1136 || scale*screenHeight > 1136) {
-            return 1;
-        }
+        trace('Native resolution is $screenWidth x $screenHeight, width a scale of $scale');
+
+        // Removing this resolution hack so we can get nice crisp high-res graphics on tablets
+        // #clover
+//        if (scale*screenWidth > 1136 || scale*screenHeight > 1136) {
+//            return 1;
+//        }
         return scale;
     }
 
