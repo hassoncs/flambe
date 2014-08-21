@@ -43,6 +43,23 @@ typedef LayerFormat = {
     flipbook: Null<Bool>,
 
     keyframes: Array<KeyframeFormat>,
+
+    guide: Bool,
+
+    // Optional - size of the font
+    fontSize: Null<Int>,
+
+    // Optional - name of the font
+    fontFace: Null<String>,
+
+    // Optional - default string to set in the text when created
+    defaultText: Null<String>,
+
+    // Optional - the paragraph alignment, (left, right, center)
+    alignment: Null<String>,
+
+    // Optional - the fontStyle, usually a color name
+    styleName: Null<String>
 }
 
 typedef KeyframeFormat = {
@@ -78,6 +95,9 @@ typedef KeyframeFormat = {
 
     // Optional: Easing factor to tween this keyframe's properties, from -1.0 to 1.0. Defaults to 0
     ease: Null<Float>,
+
+    // Optional: Size [x, y] properties. Defaults to [0, 0]
+    size: Null<Array<Float>>,
 }
 
 typedef AtlasFormat = {

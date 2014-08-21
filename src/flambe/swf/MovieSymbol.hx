@@ -73,12 +73,46 @@ class MovieLayer
     /** Whether this layer has no symbol instances. */
     public var empty (default, null) :Bool = true;
 
+    /** Whether this layer is a guide layer, with no symbol to manipulate. */
+    public var guide (default, null) :Bool = false;
+
+    /** Size properties */
+    public var width (default, null) :Float = 0;
+
+    public var height (default, null) :Float = 0;
+
+    /** Text specific properties */
+    public var fontFace :String = null;
+
+    public var fontSize :Int = 0;
+
+    public var defaultText (default, null):String = null;
+
+    public var alignment (default, null):String = 'left';
+
+    public var styleName (default, null):String = null;
+
+
     public function new (json :LayerFormat)
     {
         name = json.name;
+        guide = json.guide;
 
         var prevKf = null;
         keyframes = Arrays.create(json.keyframes.length);
+        fontFace = json.fontFace;
+        fontSize = json.fontSize;
+
+        defaultText = json.defaultText;
+        alignment = json.alignment;
+        styleName = json.styleName;
+
+        var size = json.keyframes[0].size;
+        if (size != null) {
+            width = size[0];
+            height = size[1];
+        }
+
         for (ii in 0...keyframes.length) {
             prevKf = new MovieKeyframe(json.keyframes[ii], prevKf);
             keyframes[ii] = prevKf;

@@ -4,6 +4,12 @@
 
 package flambe.swf;
 
+import flambe.math.Point;
+import flambe.util.Strings;
+import flambe.util.BitSets;
+import flambe.util.Arrays;
+import flambe.util.SignalConnection;
+import flambe.util.Value;
 import flambe.animation.AnimatedFloat;
 import flambe.display.Sprite;
 import flambe.math.FMath;
@@ -25,6 +31,9 @@ class MovieSprite extends Sprite
     /** The current playback position in seconds. */
     public var position (get, set) :Float;
 
+    /** The current MovieSymbol frame label. */
+    public var label (default, null) :Value<String> = new Value<String>(null);
+
     /**
      * The playback speed multiplier of this movie, defaults to 1.0. Higher values will play faster.
      * This does not affect the speed of nested child movies, use `flambe.SpeedAdjuster` if you need
@@ -44,16 +53,48 @@ class MovieSprite extends Sprite
         this.symbol = symbol;
 
         speed = new AnimatedFloat(1);
+        _labelFrames = new Map<String, MovieKeyframe>();
+        _positions = new Map<String, Point>();
 
-        _animators = Arrays.create(symbol.layers.length);
-        for (ii in 0..._animators.length) {
+        _animators = Arrays.create(0);
+        for (ii in 0...symbol.layers.length)
+        {
             var layer = symbol.layers[ii];
-            _animators[ii] = new LayerAnimator(layer);
+            var indexOfPositionSnip = layer.name.indexOf('_position');
+            var positionalLayer:Bool = indexOfPositionSnip >= 0;
+            var positionName:String = layer.name.substring(0, indexOfPositionSnip);
+            if (positionalLayer) {
+                var firstFrame = layer.keyframes[0];
+                var position:Point = new Point(firstFrame.x, firstFrame.y);
+                _positions.set(positionName, position);
+                continue;
+            }
+
+            var animator = new LayerAnimator(layer);
+            _animators.push(animator);
+            if (layer.name == 'labels')
+            {
+                var frames:Array<MovieKeyframe> = layer.keyframes;
+                Lambda.iter(frames, function(kf:MovieKeyframe)
+                {
+                    _labelFrames.set(kf.label, kf);
+                });
+                _labelChangeConnection = animator.activeLabel.changed.connect(
+                    function(newLabel:String, oldLabel:String)
+                    {
+                        label._ = newLabel;
+                    });
+            }
         }
 
         _frame = 0;
         _position = 0;
         goto(1);
+    }
+
+    public function getPosition(name:String):Point
+    {
+        return _positions.get(name);
     }
 
     /**
@@ -62,10 +103,13 @@ class MovieSprite extends Sprite
      * an avatar.
      * @param required If true and the layer is not found, an error is thrown.
      */
-    public function getLayer (name :String, required :Bool = true) :Entity
+
+    public function getLayer(name:String, required:Bool = true):Entity
     {
-        for (animator in _animators) {
-            if (animator.layer.name == name) {
+        for (animator in _animators)
+        {
+            if (animator.layer.name == name)
+            {
                 return animator.content;
             }
         }
@@ -75,11 +119,12 @@ class MovieSprite extends Sprite
         return null;
     }
 
-    override public function onAdded ()
+    override public function onAdded()
     {
         super.onAdded();
 
-        for (animator in _animators) {
+        for (animator in _animators)
+        {
             owner.addChild(animator.content);
         }
     }
@@ -90,89 +135,140 @@ class MovieSprite extends Sprite
 
         // Detach the animator content layers so they don't get disconnected during a disposal. This
         // may be a little hacky as it prevents child components from ever being formally removed.
-        for (animator in _animators) {
+        for (animator in _animators)
+        {
             owner.removeChild(animator.content);
         }
+        if (_labelChangeConnection != null) _labelChangeConnection.dispose();
     }
 
-    override public function onUpdate (dt :Float)
+    override public function onUpdate(dt:Float)
     {
         super.onUpdate(dt);
 
         speed.update(dt);
 
         switch (_flags & (PAUSED | SKIP_NEXT)) {
-        case 0:
-            // Neither paused nor skipping set, advance time
-            _position += speed._*dt;
-            if (_position > symbol.duration) {
-                _position = _position % symbol.duration;
+            case 0:
+                // Neither paused nor skipping set, advance time
+                _position += speed._ * dt;
+                if (_position > symbol.duration)
+                {
+                    _position = _position % symbol.duration;
 
-                if (_looped != null) {
-                    _looped.emit();
+                    if (_looped != null)
+                    {
+                        _looped.emit();
+                    }
                 }
-            }
-        case SKIP_NEXT:
-            // Not paused, but skip this time step
-            _flags = _flags.remove(SKIP_NEXT);
+            case SKIP_NEXT:
+                // Not paused, but skip this time step
+                _flags = _flags.remove(SKIP_NEXT);
         }
 
-        var newFrame = _position*symbol.frameRate;
+        var newFrame = _position * symbol.frameRate;
         goto(newFrame);
     }
 
-    private function goto (newFrame :Float)
+    /**
+    *   Sugar version of the goToLabelAndSetPaused(label, true) call
+    **/
+    public function goToLabelAndStop(labelName:String, ?paused:Bool = false):Bool
     {
-        if (_frame == newFrame) {
+        return goToLabelAndSetPaused(labelName, true);
+    }
+
+    /**
+    *   Go to a frame labeled with the given labelName.
+    *   #meadow
+    **/
+    public function goToLabelAndSetPaused(labelName:String, ?paused:Bool = false):Bool
+    {
+        var suceeded = goToLabel(labelName);
+        if (!suceeded) return false;
+
+        this.paused = paused;
+        return true;
+    }
+
+    /**
+    * Goes to a label by name.
+    * Returns true if it succeeded, false if the label wasn't found.
+    *   #meadow
+    **/
+    private function goToLabel(labelName:String):Bool
+    {
+        var keyframe:MovieKeyframe = _labelFrames.get(labelName);
+        if (keyframe == null) return false;
+
+        for (animator in _animators) {
+            animator.keyframeIdx = 0;
+        }
+        _position = keyframe.index / symbol.frameRate;
+        _flags = _flags.add(SKIP_NEXT);
+
+        goto(keyframe.index);
+        return true;
+    }
+
+    private function goto(newFrame:Float)
+    {
+        if (_frame == newFrame)
+        {
             return; // No change
         }
 
         var wrapped = newFrame < _frame;
-        if (wrapped) {
-            for (animator in _animators) {
+        if (wrapped)
+        {
+            for (animator in _animators)
+            {
                 animator.needsKeyframeUpdate = true;
                 animator.keyframeIdx = 0;
             }
         }
-        for (animator in _animators) {
+        for (animator in _animators)
+        {
             animator.composeFrame(newFrame);
         }
 
         _frame = newFrame;
     }
 
-    inline private function get_position () :Float
+    inline private function get_position():Float
     {
         return _position;
     }
 
-    private function set_position (position :Float) :Float
+    private function set_position(position:Float):Float
     {
         return _position = FMath.clamp(position, 0, symbol.duration);
     }
 
-    inline private function get_paused () :Bool
+    inline private function get_paused():Bool
     {
         return _flags.contains(PAUSED);
     }
 
-    private function set_paused (paused :Bool)
+    private function set_paused(paused:Bool)
     {
         _flags = _flags.set(PAUSED, paused);
         return paused;
     }
 
-    private function get_looped () :Signal0
+    private function get_looped():Signal0
     {
-        if (_looped == null) {
+        if (_looped == null)
+        {
             _looped = new Signal0();
         }
         return _looped;
     }
 
-    override private function set_pixelSnapping (pixelSnapping :Bool) :Bool
+    override private function set_pixelSnapping(pixelSnapping:Bool):Bool
     {
-        for (layer in _animators) {
+        for (layer in _animators)
+        {
             layer.setPixelSnapping(pixelSnapping);
         }
         return super.set_pixelSnapping(pixelSnapping);
@@ -183,7 +279,8 @@ class MovieSprite extends Sprite
      * the playback position of child movies during an update step, so that after the update
      * trickles through the children, they end up at position=0 instead of position=dt.
      */
-    @:allow(flambe) function rewind ()
+
+    @:allow(flambe) function rewind()
     {
         _position = 0;
         _flags = _flags.add(SKIP_NEXT);
@@ -194,41 +291,54 @@ class MovieSprite extends Sprite
     private static inline var SKIP_NEXT = Sprite.NEXT_FLAG << 1;
     private static inline var NEXT_FLAG = Sprite.NEXT_FLAG << 2; // Must be last!
 
-    private var _animators :Array<LayerAnimator>;
+    private var _animators:Array<LayerAnimator>;
 
-    private var _position :Float;
-    private var _frame :Float;
+    private var _position:Float;
+    private var _frame:Float;
+    private var _labelChangeConnection:SignalConnection;
+    private var _labelFrames:Map<String, MovieKeyframe>;
 
-    private var _looped :Signal0 = null;
+    private var _looped:Signal0 = null;
+
+    private var _positions:Map<String, Point>;
 }
 
 private class LayerAnimator
 {
-    public var content (default, null) :Entity;
+    public var content (default, null):Entity;
 
-    public var needsKeyframeUpdate :Bool = false;
-    public var keyframeIdx :Int = 0;
+    public var needsKeyframeUpdate:Bool = false;
+    public var keyframeIdx:Int = 0;
+    public var activeLabel:Value<String> = new Value<String>(null);
 
-    public var layer :MovieLayer;
+    public var layer:MovieLayer;
 
-    public function new (layer :MovieLayer)
+    public function new(layer:MovieLayer)
     {
         this.layer = layer;
 
         content = new Entity();
-        if (layer.empty) {
+
+        if (layer.empty)
+        {
             _sprites = null;
 
-        } else {
+        } else
+        {
             // Populate _sprites with the Sprite at each keyframe, reusing consecutive symbols
             _sprites = Arrays.create(layer.keyframes.length);
-            for (ii in 0..._sprites.length) {
+            for (ii in 0..._sprites.length)
+            {
                 var kf = layer.keyframes[ii];
-                if (ii > 0 && layer.keyframes[ii-1].symbol == kf.symbol) {
-                    _sprites[ii] = _sprites[ii-1];
-                } else if (kf.symbol == null) {
+                if (ii > 0 && layer.keyframes[ii - 1].symbol == kf.symbol)
+                {
+                    _sprites[ii] = _sprites[ii - 1];
+                } else if (kf.symbol == null)
+                {
+                    trace('No symbol found, creating empty sprite');
                     _sprites[ii] = new Sprite();
-                } else {
+                } else
+                {
                     _sprites[ii] = kf.symbol.createSprite();
                 }
             }
@@ -236,14 +346,8 @@ private class LayerAnimator
         }
     }
 
-    public function composeFrame (frame :Float)
+    public function composeFrame(frame:Float)
     {
-        if (_sprites == null) {
-            // TODO(bruno): Test this code path
-            // Don't animate empty layers
-            return;
-        }
-
         var keyframes = layer.keyframes;
         var finalFrame = keyframes.length - 1;
 
@@ -262,13 +366,17 @@ private class LayerAnimator
         }
 
         var sprite;
-        if (needsKeyframeUpdate) {
+        if (needsKeyframeUpdate && _sprites != null)
+        {
             needsKeyframeUpdate = false;
             // Switch to the next instance if this is a multi-layer symbol
             sprite = _sprites[keyframeIdx];
-            if (sprite != content.get(Sprite)) {
-                if (Type.getClass(sprite) == MovieSprite) {
-                    var movie :MovieSprite = cast sprite;
+
+            if (sprite != content.get(Sprite))
+            {
+                if (Type.getClass(sprite) == MovieSprite)
+                {
+                    var movie:MovieSprite = cast sprite;
                     movie.rewind();
                 }
                 content.add(sprite);
@@ -278,9 +386,13 @@ private class LayerAnimator
         }
 
         var kf = keyframes[keyframeIdx];
-        var visible = kf.visible && kf.symbol != null;
+        if (kf.label != null) activeLabel._ = kf.label;
+        if (sprite == null) return;
+
+        var visible = layer.guide || kf.visible && kf.symbol != null;
         sprite.visible = visible;
-        if (!visible) {
+        if (!visible)
+        {
             return; // Don't bother animating invisible layers
         }
 
