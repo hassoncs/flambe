@@ -13,7 +13,7 @@ import flambe.util.Assert;
 import flambe.util.Value;
 
 #if !js
-@:generic // for performance reasons
+//@:generic // for performance reasons
 #end
 class BasicTexture<R:(TextureRoot,BasicAsset<R>)> extends BasicAsset<BasicTexture<R>>
     implements SubTexture
