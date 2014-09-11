@@ -60,9 +60,6 @@ class Library
         // Now that all symbols have been parsed, go through keyframes and resolve references
         for (movie in movies) {
             for (layer in movie.layers) {
-                // Skip guide layers
-                if (layer.guide) continue;
-
                 var keyframes = layer.keyframes;
                 var ll = keyframes.length;
                 for (ii in 0...ll) {
@@ -128,14 +125,8 @@ class Library
                 layers: [{
                     name: "flipbook",
                     flipbook: true,
-                    guide: false,
                     keyframes: keyframes,
-                    fontSize: null,
-                    fontFace: null,
-                    defaultText: null,
-                    alignment: null,
-                    styleName: null
-                }]
+                }],
             });
             lib._symbols.set(flipbook.name, movie);
 
