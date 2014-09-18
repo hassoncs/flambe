@@ -158,6 +158,11 @@ class Font
     }
 #end
 
+    function loadTexture(basePath:String, file:String):Texture
+    {
+        return _pack.getTexture(basePath + file.removeFileExtension());
+    }
+
     private function reload ()
     {
         _glyphs = new Map();
@@ -200,7 +205,7 @@ class Font
                         file = pair.getString();
                     }
                 }
-                pages.set(pageId, _pack.getTexture(basePath + file.removeFileExtension()));
+                pages.set(pageId, loadTexture(basePath, file));
 
             case "char":
                 var glyph = null;
