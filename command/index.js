@@ -760,6 +760,7 @@ Server.prototype.start = function () {
 
     var watch = require("watch");
     var crypto = require("crypto");
+    return;
     watch.createMonitor("assets", {interval: 200}, function (monitor) {
         monitor.on("changed", function (file) {
             console.log("Asset changed: " + file);
