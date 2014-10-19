@@ -63,7 +63,7 @@ class BasicKeyboard
             _sharedEvent.init(_sharedEvent.id+1, keyCode.toKey());
             down.emit(_sharedEvent);
         }
-        return true;
+        return false;
     }
 
     /**

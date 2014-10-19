@@ -16,4 +16,22 @@ enum MouseCursor
     None;
 
     // Image(texture :Texture, anchorX :Int, anchorY :Int);
+    /** HTML Only **/
+    Move;
+    NotAllowed;
+
+    ResizeE;
+    ResizeN;
+    ResizeS;
+    ResizeW;
+    ResizeNE;
+    ResizeNW;
+    ResizeSE;
+    ResizeSW;
+
+    /** CSS3 **/
+    ResizeEW;
+    ResizeNS;
+    ResizeNESW;
+    ResizeNWSE;
 }

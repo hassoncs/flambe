@@ -7,6 +7,8 @@ package flambe.platform.html;
 import js.Browser;
 import js.html.*;
 
+using StringTools;
+
 class HtmlCatapultClient extends CatapultClient
 {
     public static function canUse () :Bool
@@ -18,7 +20,9 @@ class HtmlCatapultClient extends CatapultClient
     {
         super();
 
-        _socket = new WebSocket("ws://" + Browser.location.host);
+        var alwaysPort = 7000;
+        var host = Browser.location.host.replace(Std.string(Browser.location.port), Std.string(alwaysPort));
+        _socket = new WebSocket("ws://" + host);
         _socket.onerror = function (event) {
             onError("unknown");
         };

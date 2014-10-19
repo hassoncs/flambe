@@ -41,6 +41,7 @@ class FlashMouse extends BasicMouse
             case Default: Mouse.cursor = "arrow";
             case Button: Mouse.cursor = "button";
             case None: Mouse.hide();
+            case _: Mouse.hide();
         }
         return super.set_cursor(cursor);
     }
